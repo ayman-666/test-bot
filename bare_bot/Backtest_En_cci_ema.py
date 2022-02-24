@@ -10,9 +10,9 @@ from config import *
 json_data = json.dumps({
      "ticks_history": "R_100",
     "adjust_start_time": 1,
-    "count": 10000,
+    "count": 5000,
     "end": "latest",
-    "start": 1638518520,
+    "start": 0,
     "style": "candles",
     "granularity" : 60
     })
@@ -38,16 +38,16 @@ def analize(dataframe):
     put_lose = 0
     dataframe['engulfing'] = talib.CDLENGULFING(dataframe['open'],dataframe['high'],dataframe['low'],dataframe['close'])
     #dataframe['epoch'] = [time.ctime(x) for x in dataframe['epoch'] ]
-    dataframe['cci'] = talib.CCI(dataframe['high'], dataframe['low'], dataframe['close'], timeperiod=20)
+    dataframe['cci'] = talib.CCI(dataframe['high'], dataframe['low'], dataframe['close'], timeperiod=3)
     #dataframe['angle_near'] = talib.LINEARREG_ANGLE(dataframe['close'], timeperiod=14)
-    dataframe['angle_far'] = talib.LINEARREG_ANGLE(dataframe['close'], timeperiod=200)
+    dataframe['angle_far'] = talib.LINEARREG_ANGLE(dataframe['close'], timeperiod=20)
     dataframe['sma'] = talib.SMA(dataframe['close'],timeperiod = 300)
-    dataframe['ema'] = talib.EMA(dataframe['close'],timeperiod = 100)
+    dataframe['ema'] = talib.EMA(dataframe['close'],timeperiod = 3)
     print(dataframe)
 
 #back test using dataframe rolling window
     for win in dataframe.rolling(window = 3):
-        if int(win.iloc[[0]]['engulfing']) == 100 and float(win.iloc[[0]]['angle_far']) < 0 and float(win.iloc[[0]]['cci']) > 100 and float(win.iloc[[0]]['ema']) < float(win.iloc[[0]]['close']):
+        if float(win.iloc[[0]]['angle_far']) < 0 and float(win.iloc[[0]]['cci']) > 100 and float(win.iloc[[0]]['ema']) < float(win.iloc[[0]]['close']):
             if float(win.iloc[[1]]['open']) < float(win.iloc[[2]]['open']):
                 call_win = call_win +1
                 initial_balance = initial_balance + (stake * 0.95)
@@ -56,7 +56,8 @@ def analize(dataframe):
                 call_lose = call_lose + 1
                 initial_balance = initial_balance - stake
                 pnl_seq.append("l")
-        elif int(win.iloc[[0]]['engulfing']) == -100 and float(win.iloc[[0]]['angle_far']) > 0 and float(win.iloc[[0]]['cci']) < -100 and float(win.iloc[[0]]['ema']) > float(win.iloc[[0]]['close']):
+            print (win)
+        elif float(win.iloc[[0]]['angle_far']) > 0 and float(win.iloc[[0]]['cci']) < -100 and float(win.iloc[[0]]['ema']) > float(win.iloc[[0]]['close']):
             if float(win.iloc[[1]]['open']) > float(win.iloc[[2]]['open']):
                 put_win = put_win +1
                 initial_balance = initial_balance + (stake * 0.95)
@@ -65,7 +66,9 @@ def analize(dataframe):
                 put_lose = put_lose + 1
                 initial_balance = initial_balance - stake
                 pnl_seq.append("l")
-        stake = initial_balance // 10
+                print (win)
+        stake = initial_balance // 5
+  
     print(f"initial balance {start_balance} , final balance {initial_balance} , PNL {initial_balance - start_balance}")          
     print(f"total trades {call_win + put_win + call_lose + put_lose}")
     print(f"won trades : {call_win + put_win}")
