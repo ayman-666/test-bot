@@ -35,7 +35,7 @@ def get_stream(ws10 = websocket.WebSocket()):
     json_data = json.dumps({
      "ticks_history": "R_100",
     "adjust_start_time": 1,
-     "count": 10,
+     "count": 20,
     "end": "latest",
     "start": 1,
     "style": "candles",
@@ -43,13 +43,14 @@ def get_stream(ws10 = websocket.WebSocket()):
     })
     ws10.send(json_data)
     rec = json.loads(ws10.recv())
-    rec = pd.DataFrame(rec['candles'])
-    return rec
+    try:
+        rec = pd.DataFrame(rec['candles'])
+        return rec
+    except:
+        print(rec)
 
 def analize(dataframe):
-    dataframe['epoch'] = [time.ctime(x) for x in dataframe['epoch'] ]
-    dataframe['cci'] = talib.CCI(dataframe['high'], dataframe['low'], dataframe['close'], timeperiod=4)
-    dataframe['ema'] = talib.TRIMA(dataframe['close'],timeperiod = 50)
+    dataframe['LR_angle'] = talib.LINEARREG_ANGLE(dataframe['close'], timeperiod=2)
     return dataframe
 
 def on_open(ws):
@@ -65,17 +66,15 @@ def on_message(ws, message):
         try:
             rec = analize(get_stream())
             #print (rec.tail(10))
-            cci2 = float(rec.iloc[[-2]]['cci'])
-            cci1 = float(rec.iloc[[-3]]['cci'])
-            ema = float(rec.iloc[[-2]]['ema'])
-            close = float(rec.iloc[[-2]]['close'])
+            angle1 = float(rec.iloc[[-2]]['LR_angle'])
+            angle2 = float(rec.iloc[[-3]]['LR_angle'])
             
-            if abs(cci1 - cci2) > 40 and  cci1 > cci2 and close > ema:
+            if angle1 < 60 and  angle2 > -60:
                     buy("CALL")
-                    time.sleep(120)
-            elif abs(cci1 - cci2) > 40 and  cci1 < cci2 and close < ema:
+                    time.sleep(60)
+            elif angle2 > 60 and  angle1 < -60:
                     buy("PUT")
-                    time.sleep(120)
+                    time.sleep(60)
         except:
             pass
 if __name__ == "__main__":

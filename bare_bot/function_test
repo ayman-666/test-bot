@@ -1,0 +1,50 @@
+import websocket, json , talib , time
+import pandas as pd
+from config import *
+
+def buy(direction , duration = 1 ,ws2 = websocket.WebSocket()):
+    ws2.connect(apiUrl)
+    data = json.dumps({'authorize': token})
+    ws2.send(data)
+    
+    while True :
+        message = json.loads(ws2.recv())
+        print("message conatins")
+        print(message)
+        #
+        if 'error' in message.keys():
+            print('Error Happened: %s' % message)
+            # With Websockets we can not control the order things are processed in so we need
+            # to ensure that we have received a response to authorize before we continue.
+        elif message["msg_type"] == 'authorize':
+            balance = message["authorize"]["balance"]
+            print("Authorized OK, so now buy Contract")
+            json_data1 = json.dumps({"buy": 1, "subscribe": 1,"price":100, "parameters": {
+                                    "amount": (balance//10), "basis": "stake", "contract_type": f"{direction}", "currency": "USD", "duration": duration, "duration_unit": "m", "symbol": "R_100"}})
+            ws2.send(json_data1)
+            # Our buy request was successful let's print the results.
+        elif message["msg_type"] == 'buy':
+            print("contract Id  %s " %  message["buy"]["contract_id"] )
+            print("Details %s " % message["buy"]["longcode"] )
+
+        elif message["msg_type"] == 'proposal_open_contract':
+            isSold = bool(message["proposal_open_contract"]["is_sold"])
+                # If `isSold` is true it means our contract has finished and we can see if we won or not.
+            if isSold:
+                print("Contract %s " % message["proposal_open_contract"]["status"] )
+                print("Profit %s " %  message["proposal_open_contract"]["profit"] )
+                ws2.close()
+                break
+            else:  # We can track the status of our contract as updates to the spot price occur.
+                currentSpot = message["proposal_open_contract"]["current_spot"]
+                entrySpot = 0
+                try:
+                    if message["proposal_open_contract"]["entry_tick"] != None:
+                        entrySpot = message["proposal_open_contract"]["entry_tick"]
+                except:
+                    pass
+                print ("Entry spot %s" % entrySpot )
+                print ("Current spot %s" % currentSpot )
+                print ("Difference %s" % (currentSpot - entrySpot) )
+
+buy("PUT")

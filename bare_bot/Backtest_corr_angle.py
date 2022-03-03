@@ -1,4 +1,5 @@
 
+from numpy import angle
 import talib
 import websocket
 import json
@@ -39,43 +40,47 @@ def analize(dataframe):
     put_win = 0 
     put_lose = 0
     dataframe['epoch'] = [time.ctime(x) for x in dataframe['epoch'] ]
-    dataframe['cci'] = talib.CCI(dataframe['high'], dataframe['low'], dataframe['close'], timeperiod=4)
+    dataframe['cci'] = talib.CCI(dataframe['high'], dataframe['low'], dataframe['close'], timeperiod=3)
     dataframe['ema'] = talib.TRIMA(dataframe['close'],timeperiod = 50)
     dataframe['ATR'] = talib.ATR(dataframe['high'], dataframe['low'], dataframe['close'], timeperiod=5)
-    dataframe['rsi'] = talib.RSI(dataframe['close'], timeperiod=3)
-    dataframe['LR_angle'] = talib.LINEARREG_ANGLE(dataframe['close'], timeperiod=10)
+    dataframe['rsi'] = talib.RSI(dataframe['close'], timeperiod=10)
+    dataframe['LR_angle'] = talib.LINEARREG_ANGLE(dataframe['close'], timeperiod=2)
     dataframe['LR'] = talib.LINEARREG(dataframe['close'], timeperiod=10)
+    dataframe['upperband'], dataframe['middleband'], dataframe['lowerband'] = talib.BBANDS(dataframe['close'], timeperiod=50, nbdevup=1.6, nbdevdn=1.6, matype=0)
     print(dataframe.tail(20))
 
 #back test using dataframe rolling window
     for win in dataframe.rolling(window = 4):
         try:
-            cci1 = float(win.iloc[[0]]['cci'])
-            cci2 = float(win.iloc[[1]]['cci'])
+            angle1 = int(win.iloc[[0]]['LR_angle'])
+            angle2 = int(win.iloc[[1]]['LR_angle'])
+            UB = float(win.iloc[[1]]['upperband'])
+            LB = float(win.iloc[[1]]['lowerband'])
+            cci = int(win.iloc[[1]]['cci'])
             ema = float(win.iloc[[1]]['ema'])
             close = float(win.iloc[[1]]['close'])
             atr = float(win.iloc[[1]]['ATR'])
             rsi = float(win.iloc[[1]]['rsi'])
             
-            if abs(cci1 - cci2) > 40 and  cci1 > cci2 and close > ema and rsi > 80: #atr < 14:# :
-                if float(win.iloc[[2]]['open']) < float(win.iloc[[3]]['open']):
+            if close > UB :
+                if float(win.iloc[[2]]['open']) < float(win.iloc[[2]]['close']):
                     call_win = call_win +1
                     initial_balance = initial_balance + (stake * 0.95)
                     pnl_seq.append(f"w({initial_balance})")
-                elif float(win.iloc[[1]]['open']) > float(win.iloc[[2]]['open']):
+                elif float(win.iloc[[1]]['open']) > float(win.iloc[[2]]['close']):
                     call_lose = call_lose + 1
                     initial_balance = initial_balance - stake
                     pnl_seq.append(f"l({initial_balance})")
-            elif abs(cci1 - cci2) > 40 and  cci1 < cci2 and close < ema and rsi < 20:# atr < 14:# and:
-                if float(win.iloc[[2]]['open']) > float(win.iloc[[3]]['open']):
+            elif close < LB :
+                if float(win.iloc[[2]]['open']) > float(win.iloc[[2]]['close']):
                     put_win = put_win +1
                     initial_balance = initial_balance + (stake * 0.95)
                     pnl_seq.append(f"w({initial_balance})") 
-                elif float(win.iloc[[2]]['open']) < float(win.iloc[[3]]['open']):
+                elif float(win.iloc[[2]]['open']) < float(win.iloc[[2]]['close']):
                     put_lose = put_lose + 1
                     initial_balance = initial_balance - stake
                     pnl_seq.append(f"l({initial_balance})")
-            stake = initial_balance // 25
+            stake = initial_balance // 10
         except:
             pass
     print(f"initial balance {start_balance} , final balance {initial_balance} , PNL {initial_balance - start_balance}")          
@@ -92,7 +97,7 @@ s = send(json_data)
 #s = pd.read_excel("backtest.xlsx")#(,"openpyxl")
 #backtest = analize(resp)
 backtest = analize(s)
-backtest.to_excel("backtest3.xlsx")
+#backtest.to_excel("backtest3.xlsx")
 
 
 

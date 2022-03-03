@@ -48,30 +48,32 @@ def analize(dataframe):
     print(dataframe.tail(20))
 
 #back test using dataframe rolling window
-    for win in dataframe.rolling(window = 4):
+    for win in dataframe.rolling(window = 3):
         try:
-            cci1 = float(win.iloc[[0]]['cci'])
-            cci2 = float(win.iloc[[1]]['cci'])
+            max_close = float(win['close'].max())
+            min_close = float(win['close'].min())
+            #print(f'max close {max_close} , min close {min_close}')
+            prev_close = float(win.iloc[[-2]]['close'])
             ema = float(win.iloc[[1]]['ema'])
-            close = float(win.iloc[[1]]['close'])
-            atr = float(win.iloc[[1]]['ATR'])
-            rsi = float(win.iloc[[1]]['rsi'])
+            #print ("privious close " + str(prev_close))
+
+
             
-            if abs(cci1 - cci2) > 40 and  cci1 > cci2 and close > ema and rsi > 80: #atr < 14:# :
-                if float(win.iloc[[2]]['open']) < float(win.iloc[[3]]['open']):
+            if prev_close == min_close and prev_close > ema: #atr < 14:# :
+                if float(win.iloc[[-1]]['open']) < float(win.iloc[[-1]]['close']):
                     call_win = call_win +1
                     initial_balance = initial_balance + (stake * 0.95)
                     pnl_seq.append(f"w({initial_balance})")
-                elif float(win.iloc[[1]]['open']) > float(win.iloc[[2]]['open']):
+                elif float(win.iloc[[-1]]['open']) > float(win.iloc[[-1]]['close']):
                     call_lose = call_lose + 1
                     initial_balance = initial_balance - stake
                     pnl_seq.append(f"l({initial_balance})")
-            elif abs(cci1 - cci2) > 40 and  cci1 < cci2 and close < ema and rsi < 20:# atr < 14:# and:
-                if float(win.iloc[[2]]['open']) > float(win.iloc[[3]]['open']):
+            elif prev_close == max_close and prev_close < ema:# atr < 14:# and:
+                if float(win.iloc[[-1]]['open']) > float(win.iloc[[-1]]['close']):
                     put_win = put_win +1
                     initial_balance = initial_balance + (stake * 0.95)
                     pnl_seq.append(f"w({initial_balance})") 
-                elif float(win.iloc[[2]]['open']) < float(win.iloc[[3]]['open']):
+                elif float(win.iloc[[-1]]['open']) < float(win.iloc[[-1]]['close']):
                     put_lose = put_lose + 1
                     initial_balance = initial_balance - stake
                     pnl_seq.append(f"l({initial_balance})")
