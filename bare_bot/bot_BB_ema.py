@@ -3,10 +3,14 @@ import websocket, json , talib , time
 import pandas as pd
 from config import *
 
+steps = 1
+
 def buy(direction , duration = 1 ,ws2 = websocket.WebSocket()):
     ws2.connect(apiUrl)
     data = json.dumps({'authorize': token})
     ws2.send(data)
+
+    global steps
     
     while True :
         message = json.loads(ws2.recv())
@@ -21,7 +25,7 @@ def buy(direction , duration = 1 ,ws2 = websocket.WebSocket()):
             balance = message["authorize"]["balance"]
             print("Authorized OK, so now buy Contract")
             json_data1 = json.dumps({"buy": 1, "subscribe": 1,"price":100, "parameters": {
-                                    "amount": (balance//10), "basis": "stake", "contract_type": f"{direction}", "currency": "USD", "duration": duration, "duration_unit": "m", "symbol": "R_100"}})
+                                    "amount": (balance//20)*steps, "basis": "stake", "contract_type": f"{direction}", "currency": "USD", "duration": duration, "duration_unit": "m", "symbol": "R_100"}})
             ws2.send(json_data1)
             # Our buy request was successful let's print the results.
         elif message["msg_type"] == 'buy':
@@ -34,6 +38,10 @@ def buy(direction , duration = 1 ,ws2 = websocket.WebSocket()):
             if isSold:
                 print("Contract %s " % message["proposal_open_contract"]["status"] )
                 print("Profit %s " %  message["proposal_open_contract"]["profit"] )
+                if message["proposal_open_contract"]["status"] == 'won':
+                    steps = 1
+                else :
+                    steps = steps * 2.5
                 ws2.close()
                 break
             else:  # We can track the status of our contract as updates to the spot price occur.
@@ -74,7 +82,7 @@ def analize(dataframe):
 
 #  {   Sma,    Ema,    Wma,    Dema,    Tema,    Trima,    Kama,    Mama,    T3 };
     dataframe['epoch'] = [time.ctime(x) for x in dataframe['epoch'] ]
-    dataframe["TSF"] = talib.TSF(dataframe['close'], timeperiod=10)
+    dataframe["rsi"] = talib.RSI(dataframe['open'], timeperiod=5)
     dataframe['upperband'], dataframe['middleband'], dataframe['lowerband'] = talib.BBANDS(dataframe['close'], timeperiod=10, nbdevup=1, nbdevdn=1, matype=2)
     return dataframe
 
@@ -86,6 +94,7 @@ def on_open(ws):
         print("couldnt open connection")
 
 def on_message(ws, message):
+    global steps
     data = json.loads(message)
     #print('Data: %s' % message) # Uncomment this line to see all response data.
     if 'error' in data.keys():
@@ -96,19 +105,21 @@ def on_message(ws, message):
             #print (rec.tail(10))
             close = double(rec.iloc[[-2]]['close'])
             price = double(rec.iloc[[-1]]['close'])
+            RSI = double(rec.iloc[[-1]]['rsi'])
             current_open = double(rec.iloc[[-1]]['open'])
             UB , LB  = double(rec.iloc[[-2]]['upperband']) , double(rec.iloc[[-2]]['lowerband'])
             prev_red = double(rec.iloc[[-3]]['close']) > double(rec.iloc[[-3]]['open'])
-            #print(rec)
-            print(f'current open : {current_open},   BB UB {UB}   , BB LB = {LB} , current price {price}')
-            if (current_open < LB  ) :
+            print(f"maringale steps = {steps}")
+            print(f'current open : {current_open}, RSI: {RSI}, BB UB {UB}, BB LB = {LB} , current price {price}')
+            if (current_open < LB and RSI > 30 ) :
                     buy("CALL")
                     
-            elif (current_open > UB  ):
+            elif (current_open > UB  and RSI < 7):
                     buy("PUT")
                     
-        except:
+        except Exception as e:
             print (f"error : {data}")
+            print(e)
             pass
             
 if __name__ == "__main__":
